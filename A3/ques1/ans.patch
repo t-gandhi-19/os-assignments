@@ -1,0 +1,91 @@
+diff --git lin1/linux-5.14.6/arch/x86/entry/syscalls/syscall_64.tbl lin2/linux-5.14.6/arch/x86/entry/syscalls/syscall_64.tbl
+index f6b5779..145d9e5 100644
+--- lin1/linux-5.14.6/arch/x86/entry/syscalls/syscall_64.tbl
++++ lin2/linux-5.14.6/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -369,6 +369,7 @@
+ 445    common  landlock_add_rule   sys_landlock_add_rule
+ 446    common  landlock_restrict_self  sys_landlock_restrict_self
+ 447    common  memfd_secret        sys_memfd_secret
++448    common  delay_vr        sys_delay_vr
+ 
+ #
+ # Due to a historical design error, certain syscalls are numbered differently
+diff --git lin1/linux-5.14.6/include/linux/sched.h lin2/linux-5.14.6/include/linux/sched.h
+index ec8d07d..bafec85 100644
+--- lin1/linux-5.14.6/include/linux/sched.h
++++ lin2/linux-5.14.6/include/linux/sched.h
+@@ -473,6 +473,7 @@ struct sched_entity {
+    u64             sum_exec_runtime;
+    u64             vruntime;
+    u64             prev_sum_exec_runtime;
++   u64             del;
+ 
+    u64             nr_migrations;
+ 
+diff --git lin1/linux-5.14.6/kernel/sched/core.c lin2/linux-5.14.6/kernel/sched/core.c
+index 399c37c..5e5770d 100644
+--- lin1/linux-5.14.6/kernel/sched/core.c
++++ lin2/linux-5.14.6/kernel/sched/core.c
+@@ -3956,6 +3956,7 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
+    p->se.prev_sum_exec_runtime = 0;
+    p->se.nr_migrations     = 0;
+    p->se.vruntime          = 0;
++   p->se.del               = 0;
+    INIT_LIST_HEAD(&p->se.group_node);
+ 
+ #ifdef CONFIG_FAIR_GROUP_SCHED
+diff --git lin1/linux-5.14.6/kernel/sched/fair.c lin2/linux-5.14.6/kernel/sched/fair.c
+index 30a6984..9639442 100644
+--- lin1/linux-5.14.6/kernel/sched/fair.c
++++ lin2/linux-5.14.6/kernel/sched/fair.c
+@@ -799,7 +799,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
+    if (unlikely(!curr))
+        return;
+ 
+-   delta_exec = now - curr->exec_start;
++   delta_exec = now - curr->exec_start + curr->del;
+    if (unlikely((s64)delta_exec <= 0))
+        return;
+ 
+diff --git lin1/linux-5.14.6/kernel/sys.c lin2/linux-5.14.6/kernel/sys.c
+index ef1a78f..c8f5097 100644
+--- lin1/linux-5.14.6/kernel/sys.c
++++ lin2/linux-5.14.6/kernel/sys.c
+@@ -200,6 +200,36 @@ out:
+    return error;
+ }
+ 
++SYSCALL_DEFINE2(delay_vr, long, pid, int, del)
++{
++   struct task_struct *task;
++   struct sched_entity *task_se;
++
++   if(del < 0)
++    {
++        printk(KERN_ALERT "Invalid value of delay.\n");
++       return -EINVAL;        
++    }
++
++   int flag=0;
++   unsigned long long int val = (unsigned long long int) del * 1000000;
++
++   for_each_process(task)
++   {
++       if(pid==(long)task->pid)  
++       {
++           flag=1;
++           task_se = &(task->se);
++           task_se->del = val;
++       }
++   }
++   if(flag==0){  
++       printk(KERN_ALERT "No such task with PID.\n", pid);
++       return -ESRCH;  
++   }
++    return 0;
++}
++
+ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ {
+    struct task_struct *g, *p;
+ 
