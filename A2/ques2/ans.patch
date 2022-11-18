@@ -1,0 +1,39 @@
+
+diff --git lin1/linux-5.14.6/arch/x86/entry/syscalls/syscall_64.tbl lin2/linux-5.14.6/arch/x86/entry/syscalls/syscall_64.tbl
+index f6b5779..86d340c 100644
+--- lin1/linux-5.14.6/arch/x86/entry/syscalls/syscall_64.tbl
++++ lin2/linux-5.14.6/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -369,6 +369,7 @@
+ 445    common  landlock_add_rule   sys_landlock_add_rule
+ 446    common  landlock_restrict_self  sys_landlock_restrict_self
+ 447    common  memfd_secret        sys_memfd_secret
++448    common  kernel_2d_memcpy    sys_kernel_2d_memcpy
+ 
+ #
+ # Due to a historical design error, certain syscalls are numbered differently
+diff --git lin1/linux-5.14.6/kernel/sys.c lin2/linux-5.14.6/kernel/sys.c
+index ef1a78f..3a4c4df 100644
+--- lin1/linux-5.14.6/kernel/sys.c
++++ lin2/linux-5.14.6/kernel/sys.c
+@@ -200,6 +200,19 @@ out:
+    return error;
+ }
+ 
++SYSCALL_DEFINE4(kernel_2d_memcpy, float *, from, float *, to, int, r, int, c)
++{
++    float buf[r][c];
++    if(__copy_from_user(buf, from, r*c*sizeof(float))){
++        return -EFAULT;
++    }
++    if(__copy_to_user(to, buf, r*c*sizeof(float))){
++        return -EFAULT;
++    }
++    return 0;
++}
++
++
+ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ {
+    struct task_struct *g, *p;
+ 
+
